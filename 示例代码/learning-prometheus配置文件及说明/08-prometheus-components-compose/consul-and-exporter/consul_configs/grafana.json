@@ -1,0 +1,15 @@
+{
+  "services": [
+    {
+      "id": "grafana",
+      "name": "grafana",
+      "address": "grafana.magedu.com",
+      "port": 3000,
+      "tags": ["grafana"],
+      "checks": [{
+        "http": "http://grafana.magedu.com:3000/metrics",
+        "interval": "5s"
+      }]
+    }
+  ]
+}

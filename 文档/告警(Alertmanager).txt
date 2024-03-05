@@ -1,0 +1,105 @@
+# 安装alertmanager
+https://prometheus.io/download
+
+# 解压到/usr/local目录
+tar xf alertmanager-0.26.0.linux-amd64.tar.gz -C /usr/local/
+
+# 授权data目录
+useradd -r prometheus
+mkdir /usr/local/alertmanager/data
+chown -R prometheus.prometheus /usr/local/alertmanager/data
+
+# 创建Systemd Unitfile，保存于/usr/lib/systemd/system/alertmanager.service
+
+[Unit]
+Description=alertmanager
+Documentation=https://prometheus.io/docs/introduction/overview/
+After=network.target
+
+[Service]
+Type=simple
+User=prometheus
+ExecStart=/usr/local/alertmanager/alertmanager \
+            --config.file="/usr/local/alertmanager/alertmanager.yml" \
+            --storage.path="/usr/local/alertmanager/data/" \
+            --data.retention=120h \
+            --log.level=info
+ExecReload=/bin/kill -HUP $MAINPID
+TimeoutStopSec=20s
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+# 启动alertmanager服务
+systemctl daemon-reload
+systemctl start alertmanager.service
+systemctl enable alertmanager.service
+
+
+# 配置alertmanager.yml
+cd /usr/local/alertmanager
+vim alertmanager.yml
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 2m
+  receiver: 'email-to-me'
+
+receivers:
+- name: 'email-to-me'
+  email_configs:
+  - to: '176637151@qq.com'
+    from: '176637151@qq.com'
+	smarthost: 'smpt.qq.com:465'
+	auth_username: '176637151@qq.com'
+	auth_identity: '176637151@qq.com'
+	auth_password: 'bogkvcngbvylbhje'
+	require_tls: false
+	
+# 重启alertmanager服务
+systemctl reload alertmanager
+
+# 定义告警规则
+cd /usr/local/prometheus/rules/alert
+vim example_rule.yaml
+
+groups:
+- name: AllInstances
+  rules:
+  - alert: InstanceDown
+    expr: up == 0
+    for: 1m
+    annotations:
+      title: 'Instance down'
+	  description: Instance has been down for more than 1 minute.
+	  summary: 'Instance down'
+	labels:
+      severity: 'critical'
+	
+# 将告警规则和alertmananger静态配置到prometheus.yml中
+alerting:
+  alertmanagers:
+    - static_configs:
+	    - targets:
+		  - ubuntu22-server01:9093
+		  
+rule_files:
+  - "rules/alert/example_rule.yaml"
+  
+scrape_configs
+  - job_name: "alertmanager"
+    static_configs:
+      - targets:
+          - "ubuntu22-server01:9093"	  
+
+	
+# 检查语法
+./promtool check config prometheus.yml
+
+# 重新加载服务
+systemctl reload prometheus.yml	  

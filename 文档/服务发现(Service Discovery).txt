@@ -1,0 +1,310 @@
+基于文件的服务发现：
+# 发现target的配置，定义在配置文件的job之中
+
+# 在prometheus安装目录下创建文件夹
+cd /usr/local/prometheus
+mkdir -p targets/nodes
+cd targets/nodes
+vim nodes-01.yaml
+- targets: 
+  - ubuntu22-server01:9100
+  - ubuntu22-server02:9100
+  - ubuntu22-server03:9100
+  labels: 
+    app: node-exporter
+
+mkdir -p targets/prometheus
+cd targets/prometheus
+vim prometheus-server.yaml
+- targets: 
+  - ubuntu22-server01:9090
+  labels: 
+    app: prometheus
+    job: prometheus
+
+vim prometheus.yml
+scape_configs:
+  - job_name: 'linux-servers'
+#    static_config:
+#      - "ubuntu22-server01:9100"
+#      - "ubuntu22-server02:9100"
+#      - "ubuntu22-server03:9100"
+
+    file_sd_configs:
+    - files: 
+      - targets/nodes/node*.yaml
+      refresh_interval: 1m
+
+# 检查语法
+./promtool check config ./prometheus.yml
+# 重新加载yml
+curl -XPOST localhost:9090/-/reload
+
+
+# consul服务发现功能：
+
+# 下载地址：
+https://www.consul.io/downloads/
+# 安装consul服务端：
+unzip consul_1.18.0_linux_amd64.zip -d /usr/local/bin/
+# 启动开发者模式：
+mkdir -pv /consul/data/
+mkdir -pv /etc/consul
+# 正常情况下在生产上应该使用server模式，测试环境下可以使用agent模式
+nohup consul agent -dev -ui -data-dir=/consul/data/ -config-dir=/etc/consul -client=0.0.0.0 &
+# 查看集群成员
+consul members
+curl localhost:8500/v1/catalog/nodes
+# 在Server上添加其他agent
+consul join address
+# 在agent主机上，设置该agent离开集群并关闭agent
+consul leave
+
+vim prometheus-server.json
+{
+   "services":[
+   {
+     "id": "prometheus-server01",
+     "name": "promtheus-server01",
+     "address": "ubuntu22-server01",
+     "port": 9090,
+     "tags": ["prometheus"],
+     "checks": [{ 
+       "http": "http://ubuntu22-server01:9090/metrics",
+       "interval": "5s"
+     }] 
+    }
+   ]
+}
+
+vim consul-node-exporter.json
+{
+   "services":[
+   {
+     "id": "node_exporter-server01",
+     "name": "server01",
+     "address": "ubuntu22-server01",
+     "port": 9100,
+     "tags": ["nodes"],
+     "checks": [{ 
+       "http": "http://ubuntu22-server01:9100/metrics",
+       "interval": "5s"
+     }] 
+    },
+    {
+     "id": "node_exporter-server02",
+     "name": "server02",
+     "address": "ubuntu22-server02",
+     "port": 9100,
+     "tags": ["nodes"],
+     "checks": [{ 
+       "http": "http://ubuntu22-server02:9100/metrics",
+       "interval": "5s"
+     }] 
+    },
+    {
+     "id": "node_exporter-server03",
+     "name": "server03",
+     "address": "ubuntu22-server03",
+     "port": 9100,
+     "tags": ["nodes"],
+     "checks": [{ 
+       "http": "http://ubuntu22-server03:9100/metrics",
+       "interval": "5s"
+      }] 
+     }
+    ]
+}
+
+vim consul-tomcat-exporter.json
+{
+   "services":[
+   {
+     "id": "tomcat01",
+     "name": "tomcat01",
+     "address": "ubuntu22-server01",
+     "port": 8080,
+     "tags": ["tomcat"],
+     "checks": [{ 
+       "http": "http://ubuntu22-server01:8080/metrics",
+       "interval": "5s"
+     }] 
+    }
+   ]
+}
+
+vim consul-exporter.json
+{
+   "services":[
+   {
+     "id": "consul-exporter",
+     "name": "consul-exporter",
+     "address": "ubuntu22-server01",
+     "port": 9107,
+     "tags": ["consul-exporter"],
+     "checks": [{ 
+       "http": "http://ubuntu22-server01:9107/metrics",
+       "interval": "5s"
+     }] 
+    }
+   ]
+}
+
+vim mysqld-exporter.json
+{
+   "services":[
+   {
+     "id": "mysqld-exporter",
+     "name": "mysqld-exporter",
+     "address": "ubuntu22-server01",
+     "port": 9104,
+     "tags": ["mysqld-exporter"],
+     "checks": [{ 
+       "http": "http://ubuntu22-server01:9104/metrics",
+       "interval": "5s"
+     }] 
+    }
+   ]
+}
+
+vim nginx-exporter.json
+{
+   "services":[
+   {
+     "id": "nginx-exporter",
+     "name": "nginx-exporter",
+     "address": "ubuntu22-server01",
+     "port": 9113,
+     "tags": ["nginx-exporter"],
+     "checks": [{ 
+       "http": "http://ubuntu22-server01:9113/metrics",
+       "interval": "5s"
+     }] 
+    }
+   ]
+}
+
+vim blackbox-exporter.json
+{
+   "services":[
+   {
+     "id": "blackbox-exporter",
+     "name": "blackbox-exporter",
+     "address": "ubuntu22-server01",
+     "port": 9115,
+     "tags": ["blackbox-exporter"],
+     "checks": [{ 
+       "http": "http://ubuntu22-server01:9115/metrics",
+       "interval": "5s"
+     }] 
+    }
+   ]
+}
+
+vim grafana.json
+{
+   "services":[
+   {
+     "id": "grafana",
+     "name": "grafana",
+     "address": "ubuntu22-server01",
+     "port": 3000,
+     "tags": ["grafana"],
+     "checks": [{ 
+       "http": "http://ubuntu22-server01:3000/metrics",
+       "interval": "5s"
+     }] 
+    }
+   ]
+}
+
+将以上json文件放到 /etc/consul
+运行 consul reload  可以让consul 重新加载配置信息
+也可以使用基于http api提交注册的服务
+curl -XPUT --data @json文件 http://localhost:8500/v1/agent/service/register
+
+# 如果要注销Service，使用consul service deregister命令
+
+访问consul webui 查看注册服务
+http://172.29.2.2:8500
+
+
+# 基于consul的prometheus 服务发现功能，需要在prometheus。
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+    - targets: 
+      - localhost:9090
+# 静态配置
+#  - job_name: 'linux-servers'
+#    static_configs:
+#      - targets: 
+#        - "ubuntu22-server01:9100"
+#        - "ubuntu22-server02:9100"
+#        - "ubuntu22-server03:9100"
+# 基于文件服务发现
+#     file_sd_configs:
+#     - files:
+#       - targets/nodes/*.yml
+#       refresh_interval: 1m
+
+  - job_name: 'nodes'
+    consul_sd_configs: 
+    - server: "ubuntu22-server01:8500"
+      tags: 
+      - "nodes"
+      refresh_interval: 1m
+
+  - job_name: 'mysqld-exporter'
+    consul_sd_configs: 
+    - server: "ubuntu22-server01:8500"
+      tags: 
+      - "mysqld-exporter"
+      refresh_interval: 1m
+
+  - job_name: 'nginx-exporter'
+    consul_sd_configs: 
+    - server: "ubuntu22-server01:8500"
+      tags: 
+      - "nginx-exporter"
+      refresh_interval: 1m
+
+  - job_name: 'consul-exporter'
+    consul_sd_configs: 
+    - server: "ubuntu22-server01:9107"
+      tags: 
+      - "consul-exporter"
+      refresh_interval: 1m
+	  
+	  
+  - job_name: 'blackbox-exporter'
+    consul_sd_configs: 
+    - server: "ubuntu22-server01:9115"
+      tags: 
+      - "blackbox-exporter"
+      refresh_interval: 1m	  
+
+
+  - job_name: 'grafana'
+    consul_sd_configs: 
+    - server: "ubuntu22-server01:8500"
+      tags:
+      - "grafana"
+      refresh_interval: 1m
+
+# 检查语法正确性
+./promtool check config ./prometheus.yml
+
+# 重载yml文件
+curl -XPOST localhost:9090/-/reload
+
+
+# 测试服务发现的动态性，将nodes中的server01注销掉
+consul services deregister -id node_exporter-server01
+
+# 访问consul控制台以及prometheus ui 的targets查看时node_exporter-server01都没了
+
+# 同样的想要修改一个json文件，重新注册到consul上时可以使用
+consul services register json文件
+例如： consul services register grafana.json

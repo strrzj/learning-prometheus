@@ -1,0 +1,48 @@
+version: '3.6'
+
+volumes:
+    prometheus_data: {}
+
+networks:
+  monitoring:
+    driver: bridge
+
+services:
+
+  prometheus:
+    image: prom/prometheus:v2.44.0
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - monitoring
+    extra_hosts:
+      - "server01.magedu.com:${SERVER01_HOST_IP}"
+      - "server02.magedu.com:${SERVER02_HOST_IP}"
+      - "server03.magedu.com:${SERVER03_HOST_IP}"
+    ports:
+      - 9090:9090
+    restart: always
+
+  node-exporter:
+    image: prom/node-exporter:v1.5.0
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--path.rootfs=/rootfs'
+    ports:
+      - 9100:9100
+    networks:
+      - monitoring
+    restart: always

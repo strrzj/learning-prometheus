@@ -1,0 +1,19 @@
+[Unit]
+Description=node_exporter
+Documentation=https://prometheus.io/docs/introduction/overview/
+After=network.target
+
+[Service]
+Type=simple
+User=prometheus
+ExecStart=/usr/local/alertmanager/alertmanager \
+            --config.file="/usr/local/alertmanager/alertmanager.yml" \
+            --storage.path="/usr/local/alertmanager/data/" \
+            --data.retention=120h \
+            --log.level=info
+ExecReload=/bin/kill -HUP $MAINPID
+TimeoutStopSec=20s
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

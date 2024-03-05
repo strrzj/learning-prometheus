@@ -1,0 +1,29 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  #group_by: ['alertname']
+  #group_wait: 30s
+  #group_interval: 30s
+  repeat_interval: 10s
+  receiver: 'email-me'
+
+receivers:
+- name: 'email-me'
+  email_configs:
+  - to: '176637151@qq.com'
+    from: '176637151@qq.com'
+    smarthost: 'smtp.qq.com:465'
+    auth_username: '176637151@qq.com'
+    auth_identity: '176637151@qq.com'
+    auth_password: 'zjongtjkpgbhbhec'
+    require_tls: false
+inhibit_rules:
+- source_match:
+    alertname: InstanceDown
+    severity: critical
+  target_match:
+    alertname: InstanceDown
+    severity: critical
+  equal:
+    - instance
